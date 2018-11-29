@@ -26,8 +26,9 @@ class GetData(object):
         labels = next_element['label']
 
         if cmvn is True:
-            feas_cfg = FeaCfg.readfrom(cfg_path=cfg_path)
-            feas = (feas - feas_cfg._fea_mean) / feas_cfg._fea_var
+            self.feas_cfg = FeaCfg()
+            self.feas_cfg.readfrom(cfg_path=cfg_path)
+            feas = (feas - self.feas_cfg._fea_mean) / self.feas_cfg._fea_var
 
         feas_split = tf.split(feas, self.gpu_nums)
         labels_split = tf.split(labels, self.gpu_nums)
