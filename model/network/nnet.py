@@ -12,28 +12,29 @@
 import tensorflow as tf
 
 class NNet(object):
-    def __init__(self, gpu_nums, net_name, class_nums, batch_size):
+    def __init__(self, gpu_nums, net_name, class_nums, batch_size, fea_dim):
         self.gpu_nums = gpu_nums
         self.net_name = net_name
         self.class_nums = class_nums + 1
         self.batch_size = batch_size
+        self.fea_dim = fea_dim
 
     def build_resnet(self, is_training, inputs):
         raise NotImplementedError("Abstract method")
 
     def build_trn_graph(self, inputs, labels,learning_rate):
         print('Building Train Graph ...')
-        self.trn_inputs = inputs
-        self.trn_labels = labels
         optimizer = tf.train.GradientDescentOptimizer(learning_rate)
         # build dnn
         tower_grads = []
         self.loss_sum = tf.convert_to_tensor(0.0, dtype=tf.float32)
         for i in range(self.gpu_nums):
-            label = tf.one_hot(indices=self.trn_labels[i], depth=self.class_nums)
+            x_input = tf.reshape(tensor=inputs[i], shape=[self.batch_size//self.gpu_nums, -1, self.fea_dim])
+            y_label = tf.one_hot(indices=labels[i], depth=self.class_nums)
+
             with tf.device('/gpu:%d' % i):
-                logit = self.build_resnet(is_training=True, inputs=self.trn_inputs[i])
-                loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=label, logits=logit)
+                logit = self.build_resnet(is_training=True, inputs=x_input)
+                loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y_label, logits=logit)
                 loss_mean = tf.reduce_mean(input_tensor=loss, axis=0)
                 self.loss_sum += loss_mean
 
@@ -48,13 +49,13 @@ class NNet(object):
             self.trn_opt = optimizer.apply_gradients(grads_and_vars)
         return self.loss_sum, self.trn_opt
 
-    def run_trn_graph(self, sess, inputs, labels):
+    def run_trn_graph(self, sess):
         trn_loss = 0
         print('Do Training ... ')
         trn_step_count1 = 10000000//self.batch_size
 
         for trn_step in range(trn_step_count1):
-            _, loss_sum = sess.run([self.trn_opt, self.loss_sum], feed_dict={self.trn_inputs: inputs, self.trn_labels: labels})
+            _, loss_sum = sess.run([self.trn_opt, self.loss_sum])
 
             trn_loss += loss_sum
 
@@ -65,15 +66,14 @@ class NNet(object):
 
     def build_test_graph(self, inputs, labels):
          print('Building Test Graph ...')
-         self.test_inputs = inputs
-         self.test_labels = labels
          self.test_loss_sum = tf.convert_to_tensor(0.0, dtype=tf.float32)
 
          for i in range(self.gpu_nums):
+             x_input = tf.reshape(tensor=inputs[i], shape=[self.batch_size // self.gpu_nums, -1, self.fea_dim])
+             y_label = tf.one_hot(indices=labels[i], depth=self.class_nums)
              with tf.device('/gpu:%d' % i):
-                 label = tf.one_hot(indices=self.test_labels[i], depth=self.class_nums)
-                 logits = self.build_resnet(is_training=False, inputs=self.test_inputs[i])
-                 loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=label, logits=logits)
+                 logits = self.build_resnet(is_training=False, inputs=x_input)
+                 loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y_label, logits=logits)
                  loss_mean = tf.reduce_mean(loss, axis=0)
                  self.test_loss_sum +=loss_mean
 
@@ -82,12 +82,12 @@ class NNet(object):
 
          return self.test_loss_sum
 
-    def run_test_graph(self, sess, inputs, labels):
+    def run_test_graph(self, sess):
         test_loss = 0
 
         cv_step_count = 10000//self.batch_size
         for cv_step in range(cv_step_count):
-            test_loss_sum = sess.run(self.test_loss_sum, feed_dict={self.test_inputs: inputs, self.test_labels: labels})
+            test_loss_sum = sess.run(self.test_loss_sum)
             test_loss += test_loss_sum
 
             if (cv_step +1) % 100 == 0:

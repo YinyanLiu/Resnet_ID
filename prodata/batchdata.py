@@ -29,10 +29,11 @@ class GetData(object):
             self.feas_cfg = FeaCfg()
             self.feas_cfg.readfrom(cfg_path=cfg_path)
             feas = (feas - self.feas_cfg._fea_mean) / self.feas_cfg._fea_var
-
+        fea_shape = tf.shape(feas)
         feas_split = tf.split(feas, self.gpu_nums)
         labels_split = tf.split(labels, self.gpu_nums)
-
+        #feas_split = tf.reshape(feas_split, shape=[self.gpu_nums, self.batch_size // self.gpu_nums, -1, tf.shape(feas)[2]])
+        #labels_split = tf.reshape(labels_split, shape=[self.gpu_nums, self.batch_size // self.gpu_nums, -1, tf.shape(labels)[1]])
         return feas_split, labels_split
 
 
@@ -58,8 +59,8 @@ class GetData(object):
             'label': tf.VarLenFeature(dtype=tf.float32)}
 
         parsed_example = tf.parse_single_example(example_proto, dics)
-        parsed_example['fea'] = tf.sparse_tensor_to_dense(parsed_example['fea'])
-        parsed_example['label'] = tf.sparse_tensor_to_dense(parsed_example['label'])
+        parsed_example['fea'] = tf.sparse.to_dense(parsed_example['fea'])
+        parsed_example['label'] = tf.sparse.to_dense(parsed_example['label'])
         parsed_example['label'] = tf.cast(parsed_example['label'], tf.int32)
         parsed_example['fea'] = tf.reshape(parsed_example['fea'], parsed_example['fea_shape'])
         return parsed_example

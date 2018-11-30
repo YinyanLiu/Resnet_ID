@@ -31,7 +31,7 @@
 # import sys
 # import time
 #
-# import numpy
+
 # from six.moves import urllib
 # from six.moves import xrange  # pylint: disable=redefined-builtin
 # import tensorflow as tf
@@ -340,16 +340,8 @@
 #
 #   FLAGS, unparsed = parser.parse_known_args()
 #   tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
-
-c= []
-
-c1= dict(name='block1', base_depth=64, num_unit=3, stride=2)
-c2 = dict(name='block1', base_depth=64, num_unit=3, stride=2)
-
-a= [c1, c2]
-print(a[0]['name'])
-
-i=4
-block = 3
-a=True if (i==4) and (block != 3) else False
+import numpy as np
+t = [[[1, 2, 3], [4, 5, 6,],[7, 8, 9]], [[1, 2, 3], [4, 5, 6,],[7, 8, 9]]]
+print(np.shape(t))
+a = np.reshape(a=t, newshape=[2, 3, 3, 1])
 print(a)

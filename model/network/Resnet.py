@@ -2,6 +2,7 @@
 # _*_coding:utf-8 _*_
 
 import tensorflow as tf
+import numpy as np
 from tensorflow.contrib.layers import xavier_initializer
 from tensorflow.contrib.layers import l2_regularizer
 from model.network.nnet import NNet
@@ -28,6 +29,7 @@ class ResNet(NNet):
 
     def build_resnet(self, is_training, inputs):
         # resnet50  1 + (3+4+6+3)*3 + 1 =50
+
         layers = []
         if self.net_name == 'resnet50':
             blocks = self.resnet50()
@@ -71,7 +73,7 @@ class ResNet(NNet):
             global_pool = tf.reduce_mean(fc_relu, axis=[1, 2])
             fc_n_input = global_pool.get_shape().as_list()[-1]
             weights = tf.get_variable('fc_weight', [fc_n_input, self.class_nums],
-                                      initializer=tf.uniform_unit_scaling_initializer(factor=1.0),
+                                      initializer=tf.initializers.variance_scaling(scale=1.0),
                                       regularizer=l2_regularizer(scale=ResnetConfig.fc_weight_decay))
             bias = tf.get_variable('fc_bias', shape=[self.class_nums], initializer=tf.zeros_initializer,
                                    regularizer=l2_regularizer(ResnetConfig.fc_weight_decay))
@@ -83,8 +85,8 @@ class ResNet(NNet):
 
     def root_block(self, inputs):
 
-        x_shape = tf.shape(inputs)
-        inputs = tf.reshape(tensor=inputs, shape=[x_shape[0], x_shape[1], x_shape[2], 1])
+        x_shape = np.shape(inputs)
+        inputs = tf.reshape(tensor=inputs, shape=[x_shape[0], -1, x_shape[2], 1])
 
         fiter0 = tf.get_variable('conv0', shape=[7, 7, 1, 1], initializer=xavier_initializer(),
                                  regularizer=l2_regularizer(ResnetConfig.conv_weight_decay))

@@ -26,7 +26,7 @@ def get_parser():
     parser.add_argument('--weight_deacy', default=5e-4, help='learning alg momentum')
     parser.add_argument('--eval_datasets', default=['lfw', 'cfp_fp'], help='evluation datasets')
     parser.add_argument('--eval_db_path', default='./datasets/faces_ms1m_112x112', help='evluate datasets base path')
-    parser.add_argument('--inputs_size', default=[50, 40], help='the image size')
+    parser.add_argument('--inputs_size', default=[None, 336], help='the image size')
     parser.add_argument('--num_output', default=85164, help='the image size')
     parser.add_argument('--tf_trn_lst', default='./tfdata/train.lst', type=str,
                         help='path list to the output of tfrecords file path for traindataset')
@@ -58,22 +58,16 @@ def run_all():
     args = get_parser()
     # inputs: [batch, time, frequency, channel=1]
     batch_split = args.batch_size / args.num_gpus
-    inputs_s = tf.placeholder(name='speech_inputs', shape=[args.num_gpus, batch_split, *args.inputs_size], dtype=tf.float32)
-    labels_s = tf.placeholder(name='speech_labels', shape=[args.num_gpus, batch_split], dtype=tf.int32)
-    dropout_rate = tf.placeholder(name='dropout_rate', dtype=tf.float32)
-
     # 2. prepare train datasets and test datasets by using tensorflow dataset api
     # 2.1 train datasets
     _fetch = GetData(buffer_size=args.buffer_size, gpu_nums=args.num_gpus, epoch=args.epoch, batch_size=args.batch_size)
     X_trn_s, Y_trn_s = _fetch.fetch_data(tf_file_lst=args.tf_trn_lst, cfg_path=args.feacfg_trn_path, cmvn=True)
-
     # 2.2 test datasets
     X_test_s, Y_test_s = _fetch.fetch_data(tf_file_lst=args.tf_test_lst, cfg_path=args.feacfg_test_path, cmvn=True)
-
     # 3. Build Network
-    _nnet = ResNet(gpu_nums=args.num_gpus, net_name='resnet50', class_nums=class_nums, batch_size=args.batch_size)
-    _nnet.build_trn_graph(inputs=inputs_s,labels=labels_s, learning_rate=learning_rate)
-    _nnet.build_test_graph(inputs=inputs_s, labels=labels_s)
+    _nnet = ResNet(gpu_nums=args.num_gpus, net_name='resnet50', class_nums=class_nums, batch_size=args.batch_size, fea_dim=336)
+    _nnet.build_trn_graph(inputs=X_trn_s,labels=Y_trn_s, learning_rate=learning_rate)
+    _nnet.build_test_graph(inputs=X_test_s, labels=Y_test_s)
 
     # 4. Train Network
 
@@ -89,14 +83,12 @@ def run_all():
         sess.run(tf.local_variables_initializer())
         coord = tf.train.Coordinator()  # 管理线程
         threads = tf.train.start_queue_runners(coord=coord)
-
         for step in range(args.epoch):
             print('Iter %03d Started (lr=%f): ' % (step, learning_rate))
 
-            x_s = X_trn_s
 
-            trn_loss = _nnet.run_trn_graph(sess=sess, inputs=X_trn_s, labels=Y_trn_s)
-            cv_loss = _nnet.run_test_graph(sess=sess, inputs=np.array(X_test_s), labels=np.array(Y_test_s))
+            trn_loss = _nnet.run_trn_graph(sess=sess)
+            cv_loss = _nnet.run_test_graph(sess=sess)
 
         coord.request_stop()
         coord.join(threads)
