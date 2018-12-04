@@ -79,7 +79,7 @@ class ResNet(NNet):
                                    regularizer=l2_regularizer(ResnetConfig.fc_weight_decay))
             net_out = tf.add(tf.matmul(global_pool, weights), bias)
             net_out = tf.identity(input=net_out)
-            layers.append(outputs)
+            layers.append(net_out)
         return net_out
 
 
@@ -114,7 +114,7 @@ class ResNet(NNet):
         # because of the different dimension between input and residual output,
         # the input dimension should be dealt with convolution and batch_normalization layers
         filter_shortcut = tf.get_variable('conv_shortcut',
-                                          shape=[stride, stride, in_channels, base_depth*4],
+                                          shape=[1, 1, in_channels, base_depth*4],
                                           initializer=xavier_initializer(),
                                           regularizer=l2_regularizer(ResnetConfig.conv_weight_decay))
         x_shortcut = tf.nn.conv2d(input=inputs, filter=filter_shortcut, strides=[1, stride, stride, 1], padding='SAME')
@@ -141,9 +141,9 @@ class ResNet(NNet):
         filter3 = tf.get_variable('conv3', shape=[1, 1, base_depth, base_depth*4], initializer=xavier_initializer(),
                                   regularizer=l2_regularizer(ResnetConfig.conv_weight_decay))
         res_conv3 = tf.nn.conv2d(input=res_relu2, filter=filter3, strides=[1, stride, stride, 1], padding='SAME')
-        res_relu3 = tf.nn.relu(res_conv3)
-        out = x_shortcut + res_relu3
-        out = tf.layers.batch_normalization(inputs=out, axis=0, renorm_momentum=0.95)
+        res_bn3 = tf.layers.batch_normalization(inputs=res_conv3, axis=0, renorm_momentum=0.95)
+        out = x_shortcut + res_bn3
+        out = tf.nn.relu(out)
 
         return out
 
